@@ -28,8 +28,3 @@ urlpatterns = [
     path("accounts/", include("django.contrib.auth.urls")),
     path('Login/', include('Login.urls')),
 ]
-
-"""
-urlpatterns += [
-    path('', RedirectView.as_view(url='/Login/', permanent=True)),
-]"""

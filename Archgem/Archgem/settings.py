@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    'rest_framework',
+    'rest_framework.authtoken',
     #added apps
     "Login.apps.LoginConfig",
 ]
@@ -53,7 +55,8 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "Archgem.urls"
-
+CSRF_COOKIE_DOMAIN = '127.0.0.1'  
+CSRF_COOKIE_PATH = '/'  
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
