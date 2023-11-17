@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     #added apps
     "Login.apps.LoginConfig",
+    "Home.apps.HomeConfig"
 ]
 
 MIDDLEWARE = [
