@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.authtoken.models import Token
 import json
-
+import django
 # only basic login supported for now
 @csrf_exempt
 def index(request:HttpRequest):
@@ -13,7 +13,7 @@ def index(request:HttpRequest):
     authToken = data.get('token')
     if authToken:
         # Validate the token and retrieve the user
-        token = Token.objects.get(key=token)
+        token = Token.objects.get(key=authToken)
         user = token.user
         login(request, user)
         print("SUCCESS, LOGGED IN WITH TOKEN")

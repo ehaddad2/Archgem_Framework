@@ -6,7 +6,7 @@ from rest_framework.authtoken.models import Token
 import json
 from Home.models import Gem
 from django.contrib.auth.decorators import login_required
-
+import django
 '''
 Summary: 
 Request: 
