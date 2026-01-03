@@ -23,6 +23,21 @@ class Gem(models.Model):
     type = models.CharField(max_length=100, blank=True, null=True)
 
 
+    def _bump_cache_version(self):
+        try:
+            cache.incr("gems_cache_version")
+        except ValueError:
+            cache.set("gems_cache_version", 2, None)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self._bump_cache_version()
+
+    def delete(self, *args, **kwargs):
+        out = super().delete(*args, **kwargs)
+        self._bump_cache_version()
+        return out
+
     # Metadata
     class Meta:
         db_table = 'gem_locations'

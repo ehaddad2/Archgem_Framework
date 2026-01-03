@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     #added apps
     "Login.apps.LoginConfig",
     "Home.apps.HomeConfig"
+    #"sslserver"
 ]
 
 MIDDLEWARE = [
@@ -85,7 +86,12 @@ DATABASES = {
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
-
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
