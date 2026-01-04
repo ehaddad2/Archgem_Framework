@@ -1,7 +1,3 @@
-
-
-## `README.md` for **Archgem_Framework** (Django backend)
-
 # Archgem_Framework (Django backend)
 
 Backend framework for the Archgem iOS client. Provides:
