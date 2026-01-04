@@ -5,7 +5,28 @@ from django.core.cache import cache
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 from Home.models import Gem
+Z_LEVELS = (8, 9, 10, 11, 12)
 
+def _get_cache_version():
+    v = cache.get("gems_cache_version")
+    if v is None:
+        v = 1
+        cache.set("gems_cache_version", v, None)
+    return v
+
+def _tile_key(z, x, y, version):
+    return f"tile:{z}:{x}:{y}:v:{version}"
+
+def invalidate_tiles_for_point(lat, lon):
+    version = _get_cache_version()
+    for z in Z_LEVELS:
+        x, y = latlon_to_tile_xy(lat, lon, z)
+        cache.delete(_tile_key(z, x, y, version))
+
+def invalidate_tiles_for_move(old_lat, old_lon, new_lat, new_lon):
+    invalidate_tiles_for_point(old_lat, old_lon)
+    invalidate_tiles_for_point(new_lat, new_lon)
+    
 def z_bucket_from_span(span_lat):
     if span_lat >= 8:
         return 8
@@ -77,6 +98,7 @@ def tiles_for_viewport(center_lat, center_lon, span_lat, span_lon, z):
 
 @login_required()
 def Search(request):
+
     try:
         req = json.loads(request.body)
 
@@ -94,8 +116,8 @@ def Search(request):
             version = 1
             cache.set("gems_cache_version", version, None)
 
-        print(f"[CACHE] Search request center=({center_lat},{center_lon}) span=({span_lat},{span_lon})")
-        print(f"[CACHE] Viewport lat=[{lat_min},{lat_max}] lon=[{lon_min},{lon_max}] z_bucket={z} tiles={len(tiles)} version={version}")
+        #print(f"[CACHE] Search request center=({center_lat},{center_lon}) span=({span_lat},{span_lon})")
+        #print(f"[CACHE] Viewport lat=[{lat_min},{lat_max}] lon=[{lon_min},{lon_max}] z_bucket={z} tiles={len(tiles)} version={version}")
 
         hit_count = 0
         miss_count = 0
@@ -122,16 +144,16 @@ def Search(request):
                 payload = [str(uid) for uid in qs.values_list("uid", flat=True)]
                 cache.set(cache_key, payload, timeout=1800)
                 db_fill_count += 1
-                print(f"[CACHE MISS] SET_IDS key={cache_key} ids={len(payload)}")
+                #print(f"[CACHE MISS] SET_IDS key={cache_key} ids={len(payload)}")
             else:
                 hit_count += 1
-                print(f"[CACHE HIT] HIT_IDS key={cache_key} ids={len(payload)}")
+                #print(f"[CACHE HIT] HIT_IDS key={cache_key} ids={len(payload)}")
 
             for uid in payload:
                 id_set.add(uid)
 
         if len(id_set) == 0:
-            print(f"[CACHE] SUMMARY hits={hit_count} misses={miss_count} db_fills={db_fill_count} ids=0 returned=0")
+            #print(f"[CACHE] SUMMARY hits={hit_count} misses={miss_count} db_fills={db_fill_count} ids=0 returned=0")
             return JsonResponse({"gems": []})
 
         gems = Gem.objects.filter( #grab gems based on their ids
@@ -142,8 +164,6 @@ def Search(request):
             longitude__lte=lon_max,
         )
 
-        #TODO: search query should come in and filter based on this list.
-        print("starts w", starts_with)
         if starts_with:
             gems = gems.filter(name__startswith=starts_with) 
             
@@ -167,7 +187,7 @@ def Search(request):
                 "type": g.type,
             })
 
-        print(f"[CACHE SUMMARY] hits={hit_count} misses={miss_count} db_fills={db_fill_count} ids={len(id_set)} returned={len(out)}")
+        #print(f"[CACHE SUMMARY] hits={hit_count} misses={miss_count} db_fills={db_fill_count} ids={len(id_set)} returned={len(out)}")
 
         return JsonResponse({"gems": out})
 

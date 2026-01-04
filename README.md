@@ -56,3 +56,17 @@ Gem search. Requires authenticated Django session.
 ## Local development setup
 
 TODO
+
+## Deployment
+1. Build image: 
+```
+gcloud builds submit --tag us-central1-docker.pkg.dev/gen-lang-client-0187943201/archgem-repo/archgem-backend:latest
+```
+
+2. Deploy: 
+```
+gcloud run deploy archgem-backend \
+  --region us-central1 \
+  --image us-central1-docker.pkg.dev/gen-lang-client-0187943201/archgem-repo/archgem-backend:latest \
+  --allow-unauthenticated
+```

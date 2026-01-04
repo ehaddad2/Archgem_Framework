@@ -1,6 +1,7 @@
 from django.db import models
 from django.urls import reverse
 import uuid
+from django.core.cache import cache
 
 #Models for the Navigation View
 class Gem(models.Model):
@@ -23,7 +24,7 @@ class Gem(models.Model):
     type = models.CharField(max_length=100, blank=True, null=True)
 
 
-    def _bump_cache_version(self):
+    def _bump_cache_version(self): #use ONLY IF NEEDED - will invalidate cache
         try:
             cache.incr("gems_cache_version")
         except ValueError:

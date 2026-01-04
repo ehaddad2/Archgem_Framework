@@ -7,11 +7,20 @@ from rest_framework.authtoken.models import Token
 import json
 import django
 # only basic login supported for now
+
 @csrf_exempt
 def index(request:HttpRequest):
-    data = json.loads(request.body)
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    data = json.loads(request.body.decode("utf-8"))
+    if data is None: return JsonResponse({"error": "Invalid or empty JSON body"}, status=400)
     authToken = data.get('token')
+    
     if authToken:
+        try:
+            token = Token.objects.get(key=authToken)
+        except Token.DoesNotExist:
+            return HttpResponse(status=401)
         # Validate the token and retrieve the user
         token = Token.objects.get(key=authToken)
         user = token.user
