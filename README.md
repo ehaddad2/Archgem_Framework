@@ -8,7 +8,7 @@ Backend framework for the Archgem iOS client. Provides:
 ## Tech stack
 - Python + Django
 - Django REST Framework (Token model used)
-- Default DB in repo: SQLite (`db.sqlite3`)
+- DB: postgreSQL
 
 ## Apps
 - `Login`: authentication endpoint at `/Login/`
