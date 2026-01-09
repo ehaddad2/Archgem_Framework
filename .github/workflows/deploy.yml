@@ -128,41 +128,43 @@ jobs:
           fi
           echo "role_arn=$(aws iam get-role --role-name $ROLE_NAME --query 'Role.Arn' --output text)" >> $GITHUB_OUTPUT
 
-      - name: Parse environment variables
-        id: parse-env
+      - name: Parse environment variables to JSON file
         run: |
           # Convert comma-separated ENV_VARS to JSON format for App Runner
-          ENV_JSON=$(echo '${{ secrets.ENV_VARS }}' | tr ',' '\n' | while read line; do
-            key=$(echo "$line" | cut -d'=' -f1)
-            value=$(echo "$line" | cut -d'=' -f2-)
+          # Write to a file to avoid GITHUB_OUTPUT multiline issues
+          echo '${{ secrets.ENV_VARS }}' | tr ',' '\n' | while IFS='=' read -r key value; do
             echo "{\"Name\":\"$key\",\"Value\":\"$value\"}"
-          done | jq -s '.')
-          echo "env_json=$ENV_JSON" >> $GITHUB_OUTPUT
+          done | jq -s '.' > env_vars.json
+          cat env_vars.json
 
       - name: Create App Runner service
         if: steps.check-service.outputs.exists == 'false'
         id: create-service
         run: |
+          ENV_JSON=$(cat env_vars.json)
+          
+          # Build the source configuration JSON
+          cat > source-config.json << EOF
+          {
+            "AuthenticationConfiguration": {
+              "AccessRoleArn": "${{ steps.create-role.outputs.role_arn }}"
+            },
+            "AutoDeploymentsEnabled": false,
+            "ImageRepository": {
+              "ImageIdentifier": "${{ steps.build-image.outputs.image }}",
+              "ImageRepositoryType": "ECR",
+              "ImageConfiguration": {
+                "Port": "8080",
+                "RuntimeEnvironmentVariables": $ENV_JSON
+              }
+            }
+          }
+          EOF
+          
           SERVICE_ARN=$(aws apprunner create-service \
             --service-name ${{ env.SERVICE_NAME }} \
-            --source-configuration '{
-              "AuthenticationConfiguration": {
-                "AccessRoleArn": "${{ steps.create-role.outputs.role_arn }}"
-              },
-              "AutoDeploymentsEnabled": false,
-              "ImageRepository": {
-                "ImageIdentifier": "${{ steps.build-image.outputs.image }}",
-                "ImageRepositoryType": "ECR",
-                "ImageConfiguration": {
-                  "Port": "8080",
-                  "RuntimeEnvironmentVariables": ${{ steps.parse-env.outputs.env_json }}
-                }
-              }
-            }' \
-            --instance-configuration '{
-              "Cpu": "0.25 vCPU",
-              "Memory": "0.5 GB"
-            }' \
+            --source-configuration file://source-config.json \
+            --instance-configuration '{"Cpu": "0.25 vCPU", "Memory": "0.5 GB"}' \
             --query 'Service.ServiceArn' \
             --output text)
           echo "service_arn=$SERVICE_ARN" >> $GITHUB_OUTPUT
@@ -170,24 +172,32 @@ jobs:
       - name: Update App Runner service
         if: steps.check-service.outputs.exists == 'true'
         run: |
+          ENV_JSON=$(cat env_vars.json)
+          
+          # Build the source configuration JSON
+          cat > source-config.json << EOF
+          {
+            "AuthenticationConfiguration": {
+              "AccessRoleArn": "${{ steps.create-role.outputs.role_arn }}"
+            },
+            "AutoDeploymentsEnabled": false,
+            "ImageRepository": {
+              "ImageIdentifier": "${{ steps.build-image.outputs.image }}",
+              "ImageRepositoryType": "ECR",
+              "ImageConfiguration": {
+                "Port": "8080",
+                "RuntimeEnvironmentVariables": $ENV_JSON
+              }
+            }
+          }
+          EOF
+          
           aws apprunner update-service \
             --service-arn ${{ steps.check-service.outputs.service_arn }} \
-            --source-configuration '{
-              "AuthenticationConfiguration": {
-                "AccessRoleArn": "${{ steps.create-role.outputs.role_arn }}"
-              },
-              "AutoDeploymentsEnabled": false,
-              "ImageRepository": {
-                "ImageIdentifier": "${{ steps.build-image.outputs.image }}",
-                "ImageRepositoryType": "ECR",
-                "ImageConfiguration": {
-                  "Port": "8080",
-                  "RuntimeEnvironmentVariables": ${{ steps.parse-env.outputs.env_json }}
-                }
-              }
-            }'
+            --source-configuration file://source-config.json
 
       - name: Wait for deployment
+        id: wait-deploy
         run: |
           SERVICE_ARN="${{ steps.check-service.outputs.service_arn || steps.create-service.outputs.service_arn }}"
           echo "Waiting for App Runner service to be ready..."
