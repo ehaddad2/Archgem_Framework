@@ -4,7 +4,6 @@ import traceback
 from django.core.cache import cache
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_exempt
 from Home.models import Gem
 Z_LEVELS = (8, 9, 10, 11, 12)
 
@@ -99,7 +98,6 @@ def tiles_for_viewport(center_lat, center_lon, span_lat, span_lon, z):
     return out, lat_min, lat_max, lon_min, lon_max
 
 @login_required()
-@csrf_exempt()
 def Search(request):
 
     try:
