@@ -99,6 +99,7 @@ jobs:
           docker push "${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/archgem-repo/${{ env.SERVICE_NAME }}:${{ github.sha }}"
 
       - name: Deploy to Cloud Run
+        id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: ${{ env.SERVICE_NAME }}
@@ -107,3 +108,16 @@ jobs:
           flags: '--allow-unauthenticated'
           env_vars: ${{ secrets.ENV_VARS }}
 
+      - name: Verify Deployment Health
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 10
+          HEALTH_URL="${{ steps.deploy.outputs.url }}/health/"
+          echo "Checking health at: $HEALTH_URL"
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL")
+          if [ "$RESPONSE" != "200" ]; then
+            echo "Health check failed with status: $RESPONSE"
+            curl -s "$HEALTH_URL"
+            exit 1
+          fi
+          echo "Health check passed!"
