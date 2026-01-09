@@ -96,12 +96,23 @@ DATABASES = {
         "OPTIONS": {"sslmode": os.environ.get("DB_SSL_MODE", "require")},
     }
 }
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/1"),
+
+# Cache configuration - uses Redis if REDIS_URL is set, otherwise no caching
+_redis_url = os.environ.get("REDIS_URL", "")
+if _redis_url:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": _redis_url,
+        }
     }
-}
+else:
+    # No cache - DummyCache performs all operations but doesn't actually cache
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
