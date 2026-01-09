@@ -10,4 +10,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD exec gunicorn Archgem.Archgem.wsgi:application --bind 0.0.0.0:${PORT:-8080}
+WORKDIR /app/Archgem
+
+CMD exec gunicorn Archgem.wsgi:application --bind 0.0.0.0:${PORT:-8080}
