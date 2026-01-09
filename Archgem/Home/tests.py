@@ -79,12 +79,16 @@ class EndToEndAuthFlowTests(TestCase):
         login_data = login_response.json()
         self.assertIn('token', login_data, "Login should return a token")
         
+        # After login, Django rotates the CSRF token for security - fetch the new one
+        csrf_token_after_login = self.client.cookies.get('csrftoken')
+        self.assertIsNotNone(csrf_token_after_login, "CSRF cookie should exist after login")
+        
         # Step 3: POST /Home/Search/ with session (automatically maintained by Client)
         search_response = self.client.post(
             '/Home/Search/',
             json.dumps({'centerLat': 20.0, 'centerLong': 20.0, 'spanDeltaLat': 5.0, 'spanDeltaLong': 5.0}),
             content_type='application/json',
-            HTTP_X_CSRFTOKEN=csrf_token.value
+            HTTP_X_CSRFTOKEN=csrf_token_after_login.value
         )
         self.assertEqual(search_response.status_code, 200, 
                          f"Search should return 200, got {search_response.status_code}: {search_response.content}")
