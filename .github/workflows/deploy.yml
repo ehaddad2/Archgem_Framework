@@ -130,11 +130,11 @@ jobs:
 
       - name: Parse environment variables to JSON file
         run: |
-          # Convert comma-separated ENV_VARS to JSON format for App Runner
-          # Write to a file to avoid GITHUB_OUTPUT multiline issues
+          # Convert comma-separated ENV_VARS to JSON dict format for App Runner
+          # App Runner expects {"KEY": "value"} format, not [{Name, Value}] format
           echo '${{ secrets.ENV_VARS }}' | tr ',' '\n' | while IFS='=' read -r key value; do
-            echo "{\"Name\":\"$key\",\"Value\":\"$value\"}"
-          done | jq -s '.' > env_vars.json
+            echo "\"$key\":\"$value\""
+          done | paste -sd ',' | sed 's/^/{/' | sed 's/$/}/' > env_vars.json
           cat env_vars.json
 
       - name: Create App Runner service
