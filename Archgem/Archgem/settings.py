@@ -62,8 +62,8 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "Archgem.urls"
-CSRF_COOKIE_DOMAIN = '127.0.0.1'  
-CSRF_COOKIE_PATH = ''  
+#CSRF_COOKIE_DOMAIN = '127.0.0.1'  
+#CSRF_COOKIE_PATH = ''  
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
