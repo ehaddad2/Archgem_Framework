@@ -3,6 +3,7 @@ from django.http import HttpRequest
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
+from django.middleware.csrf import get_token
 from rest_framework.authtoken.models import Token
 import json
 import django
@@ -26,7 +27,7 @@ def index(request:HttpRequest):
         user = token.user
         login(request, user)
         print("SUCCESS, LOGGED IN WITH TOKEN")
-        return JsonResponse({'token': str(token.key)}, status=200)
+        return JsonResponse({'token': str(token.key), 'csrf': get_token(request)}, status=200)
     elif request.method == 'POST':
         # Parsing username and password from the request body
         data = json.loads(request.body)
@@ -39,7 +40,7 @@ def index(request:HttpRequest):
             login(request, user)  # Initiating a user session
             print("SUCCESS, LOGGED IN")
             token, created = Token.objects.get_or_create(user=user)
-            return JsonResponse({'token': str(token.key)}, status=200)
+            return JsonResponse({'token': str(token.key), 'csrf': get_token(request)}, status=200)
         else:
             # Incorrect credentials
             return HttpResponse(status=401)
