@@ -5,14 +5,25 @@ from django.core.cache import cache
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 from Home.models import Gem
+
 Z_LEVELS = (8, 9, 10, 11, 12)
 
+# Cache the version in-memory for 60 seconds to reduce Redis reads
+_version_cache = {"value": None, "expires": 0}
 
 def _get_cache_version():
+    import time
+    now = time.time()
+    if _version_cache["value"] is not None and now < _version_cache["expires"]:
+        return _version_cache["value"]
+    
     v = cache.get("gems_cache_version")
     if v is None:
         v = 1
         cache.set("gems_cache_version", v, None)
+    
+    _version_cache["value"] = v
+    _version_cache["expires"] = now + 60  # Cache locally for 60 seconds
     return v
 
 def _tile_key(z, x, y, version):
@@ -99,7 +110,6 @@ def tiles_for_viewport(center_lat, center_lon, span_lat, span_lon, z):
 
 @login_required()
 def Search(request):
-
     try:
         req = json.loads(request.body)
 
@@ -112,30 +122,36 @@ def Search(request):
         z = z_bucket_from_span(span_lat)
         tiles, lat_min, lat_max, lon_min, lon_max = tiles_for_viewport(center_lat, center_lon, span_lat, span_lon, z)
 
-        version = cache.get("gems_cache_version")
-        if version is None:
-            version = 1
-            cache.set("gems_cache_version", version, None)
+        # Use in-memory cached version to avoid Redis read
+        version = _get_cache_version()
 
-        #print(f"[CACHE] Search request center=({center_lat},{center_lon}) span=({span_lat},{span_lon})")
-        #print(f"[CACHE] Viewport lat=[{lat_min},{lat_max}] lon=[{lon_min},{lon_max}] z_bucket={z} tiles={len(tiles)} version={version}")
-
-        hit_count = 0
-        miss_count = 0
-        db_fill_count = 0
-
+        # OPTIMIZATION: Batch fetch all tile keys in a single Redis call
+        cache_keys = [f"tile:{zt}:{xt}:{yt}:v:{version}" for zt, xt, yt in tiles]
+        cached_values = cache.get_many(cache_keys)  # Single Redis MGET call
+        
         id_set = set()
+        tiles_to_fill = []  # Collect tiles that need DB queries
+        
+        # Process cached results
+        for i, (zt, xt, yt) in enumerate(tiles):
+            cache_key = cache_keys[i]
+            payload = cached_values.get(cache_key)
+            
+            if payload is None:
+                # Cache miss - need to query DB
+                tiles_to_fill.append((zt, xt, yt, cache_key))
+            else:
+                # Cache hit
+                for uid in payload:
+                    id_set.add(uid)
 
-        for zt, xt, yt in tiles: #grab uids in our viewpoint - try to get from cache
-            cache_key = f"tile:{zt}:{xt}:{yt}:v:{version}"
-            cache_res = cache.get(cache_key)
-            payload = cache_res if (cache_res or isinstance(cache_res, list)) else None
-
-            if not payload and not isinstance(cache_res, list):
-                miss_count += 1
+        # OPTIMIZATION: Batch set cache for all misses
+        if tiles_to_fill:
+            cache_to_set = {}
+            for zt, xt, yt, cache_key in tiles_to_fill:
                 t_lat_min, t_lat_max, t_lon_min, t_lon_max = tile_bbox(zt, xt, yt)
 
-                qs = Gem.objects.filter( #grab gems within each tile
+                qs = Gem.objects.filter(
                     latitude__gte=t_lat_min,
                     latitude__lte=t_lat_max,
                     longitude__gte=t_lon_min,
@@ -143,21 +159,18 @@ def Search(request):
                 )
 
                 payload = [str(uid) for uid in qs.values_list("uid", flat=True)]
-                cache.set(cache_key, payload, timeout=1800)
-                db_fill_count += 1
-                #print(f"[CACHE MISS] SET_IDS key={cache_key} ids={len(payload)}")
-            else:
-                hit_count += 1
-                #print(f"[CACHE HIT] HIT_IDS key={cache_key} ids={len(payload)}")
-
-            for uid in payload:
-                id_set.add(uid)
+                cache_to_set[cache_key] = payload
+                
+                for uid in payload:
+                    id_set.add(uid)
+            
+            # Single Redis MSET call for all new tiles
+            cache.set_many(cache_to_set, timeout=1800)
 
         if len(id_set) == 0:
-            #print(f"[CACHE] SUMMARY hits={hit_count} misses={miss_count} db_fills={db_fill_count} ids=0 returned=0")
             return JsonResponse({"gems": []})
 
-        gems = Gem.objects.filter( #grab gems based on their ids
+        gems = Gem.objects.filter(
             uid__in=list(id_set),
             latitude__gte=lat_min,
             latitude__lte=lat_max,
@@ -187,8 +200,6 @@ def Search(request):
                 "website": str(g.website) if g.website else None,
                 "type": g.type,
             })
-
-        #print(f"[CACHE SUMMARY] hits={hit_count} misses={miss_count} db_fills={db_fill_count} ids={len(id_set)} returned={len(out)}")
 
         return JsonResponse({"gems": out})
 
